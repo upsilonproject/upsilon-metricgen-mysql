@@ -4,18 +4,19 @@ import (
 	"fmt"
 	"log"
 	"database/sql"
-	updb "github.com/upsilonproject/upsilon-golib-database/pkg/database/"
+	upmodels "github.com/upsilonproject/upsilon-golib-database/pkg/models"
+	updb "github.com/upsilonproject/upsilon-golib-database/pkg/database"
 )
 
-func GetMetricsToGenerate(dbMetrics *sql.DB) []MetricToGenerate {
+func GetMetricsToGenerate(dbMetrics *sql.DB) []upmodels.MetricToGenerate {
 	var sql string
-	var ret = make([]MetricToGenerate, 0)
+	var ret = make([]upmodels.MetricToGenerate, 0)
 
 	sql = "SELECT DISTINCT service FROM to_generate ORDER BY service"
 	cursorService, _ := dbMetrics.Query(sql)
 
 	for cursorService.Next() {
-		var toGenerate = MetricToGenerate{Service: "ignore", Metrics: make([]string, 0)}
+		var toGenerate = upmodels.MetricToGenerate{Service: "ignore", Metrics: make([]string, 0)}
 
 		cursorService.Scan(&toGenerate.Service)
 
@@ -40,9 +41,9 @@ func GetMetricsToGenerate(dbMetrics *sql.DB) []MetricToGenerate {
 	return ret
 }
 
-func getUnprocessedServiceResults(dbUpsilon *sql.DB, serviceName string) []ServiceResult {
+func getUnprocessedServiceResults(dbUpsilon *sql.DB, serviceName string) []upmodels.ServiceResult {
 	var sql string
-	var ret = make([]ServiceResult, 0)
+	var ret = make([]upmodels.ServiceResult, 0)
 
 	sql = "UPDATE service_check_results SET metricProcessed = 1 WHERE id = ? "
 	stmt, err := dbUpsilon.Prepare(sql)
@@ -57,7 +58,7 @@ func getUnprocessedServiceResults(dbUpsilon *sql.DB, serviceName string) []Servi
 	}
 
 	for cursor.Next() {
-		result := ServiceResult{}
+		result := upmodels.ServiceResult{}
 
 		cursor.Scan(&result.Id, &result.Output, &result.Updated, &result.Identifier)
 

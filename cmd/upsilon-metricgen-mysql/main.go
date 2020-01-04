@@ -4,7 +4,8 @@ import (
 	"log"
 	"time"
 	"database/sql"
-	metricgen "github.com/upsilonproject/upsilon-metricgen-mysql/pkg/database"
+	metricgen "github.com/upsilonproject/upsilon-metricgen-mysql/internal"
+	updb "github.com/upsilonproject/upsilon-golib-database/pkg/database"
 )
 
 var (
@@ -18,7 +19,7 @@ func main() {
 	dbUpsilon = metricgen.DbConn("upsilon")
 	dbMetrics = metricgen.DbConn("upsilon_results")
 
-	stmtInsert := metricgen.PrepareMetricInsert(dbMetrics)
+	stmtInsert := updb.PrepareMetricInsert(dbMetrics)
 
 	for true {
 		metricgen.RunServiceLoop(dbUpsilon, dbMetrics, stmtInsert);

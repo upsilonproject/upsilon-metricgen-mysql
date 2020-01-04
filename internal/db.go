@@ -6,7 +6,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"log"
 
-	. "github.com/upsilonproject/upsilon-metricgen-mysql/pkg/upsilonproject/models"
+	. "github.com/upsilonproject/upsilon-golib-database/pkg/models"
 )
 
 func DbConn(dbName string) (db *sql.DB) {

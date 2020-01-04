@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"github.com/tidwall/gjson"
 
-	. "upsilonproject/upsilon-metricgen-mysql/pkg/upsilonproject/models"
+	. "github.com/upsilonproject/upsilon-golib-database/pkg/models"
 )
 
 func findJsonInOutput(output string) (string, error) {
