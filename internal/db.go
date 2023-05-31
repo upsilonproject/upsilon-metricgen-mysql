@@ -4,7 +4,8 @@ import (
 	"strings"
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
-	"log"
+	log "github.com/sirupsen/logrus"
+
 
 	. "github.com/upsilonproject/upsilon-golib-database/pkg/models"
 )
@@ -12,12 +13,12 @@ import (
 func DbConn(dbName string) (db *sql.DB) {
 	dbDriver := "mysql"
 	dbUser := "upsilon"
-	dbPass := ""
-	dbHost := "cradle"
+	dbPass := "upsilon"
+	dbHost := "upsilon"
 
 	connStr := dbUser + ":" + dbPass + "@tcp(" + dbHost + ":3306)/" + dbName
 
-	log.Println(connStr)
+	log.Infof("conn str: %v", connStr)
 
 	db, err := sql.Open(dbDriver, dbUser + ":" + dbPass + "@tcp(" + dbHost + ":3306)/" + dbName);
 

@@ -2,18 +2,23 @@ package metricgen;
 
 import (
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"database/sql"
 	upmodels "github.com/upsilonproject/upsilon-golib-database/pkg/models"
 	updb "github.com/upsilonproject/upsilon-golib-database/pkg/database"
 )
 
-func GetMetricsToGenerate(dbMetrics *sql.DB) []upmodels.MetricToGenerate {
+func GetMetricsToGenerate(dbUpsilon *sql.DB) []upmodels.MetricToGenerate {
 	var sql string
 	var ret = make([]upmodels.MetricToGenerate, 0)
 
 	sql = "SELECT DISTINCT service FROM to_generate ORDER BY service"
-	cursorService, _ := dbMetrics.Query(sql)
+	cursorService, err := dbUpsilon.Query(sql)
+
+	if err != nil {
+		log.Errorf("Could not select services to generate %v", err)
+		return ret;
+	}
 
 	for cursorService.Next() {
 		var toGenerate = upmodels.MetricToGenerate{Service: "ignore", Metrics: make([]string, 0)}
@@ -21,7 +26,7 @@ func GetMetricsToGenerate(dbMetrics *sql.DB) []upmodels.MetricToGenerate {
 		cursorService.Scan(&toGenerate.Service)
 
 		sql = "SELECT name FROM to_generate WHERE service = ?"
-		cursorNames, _ := dbMetrics.Query(sql, toGenerate.Service)
+		cursorNames, _ := dbUpsilon.Query(sql, toGenerate.Service)
 
 		for cursorNames.Next() {
 			currentMetric := ""
@@ -48,7 +53,7 @@ func getUnprocessedServiceResults(dbUpsilon *sql.DB, serviceName string) []upmod
 	sql = "UPDATE service_check_results SET metricProcessed = 1 WHERE id = ? "
 	stmt, err := dbUpsilon.Prepare(sql)
 
-	log.Println("Getting unprocessed services")
+	log.Infof("Getting unprocessed services")
 
 	sql = "SELECT r.id, r.output, r.checked, r.service FROM service_check_results r WHERE r.service = ? AND r.metricProcessed = 0 ORDER BY r.id ASC LIMIT 2000"
 	cursor, err := dbUpsilon.Query(sql, serviceName)
@@ -71,23 +76,23 @@ func getUnprocessedServiceResults(dbUpsilon *sql.DB, serviceName string) []upmod
 
 	stmt.Close();
 
-	log.Println("Finished getting service results relevant for metric")
+	log.Infof("Finished getting service results relevant for metric")
 
 	return ret
 }
 
-func RunServiceLoop(dbUpsilon *sql.DB, dbMetrics *sql.DB, stmtInsert *sql.Stmt) {
-	for _, metricsToGenerate := range GetMetricsToGenerate(dbMetrics) {
-		log.Println("Generating metrics for service", metricsToGenerate.Service)
-		log.Println(metricsToGenerate)
+func RunServiceLoop(dbUpsilon *sql.DB, stmtInsert *sql.Stmt) {
+	for _, metricsToGenerate := range GetMetricsToGenerate(dbUpsilon) {
+		log.Infof("Generating metrics for service", metricsToGenerate.Service)
+		log.Infof("togen: %v", metricsToGenerate)
 
 		results := getUnprocessedServiceResults(dbUpsilon, metricsToGenerate.Service)
 
 		for _, result := range results {
-			fmt.Println("Checking result:", result.Id)
+			log.Infof("Checking result: %v", result.Id)
 
 			for _, usefulMetric := range metricsToGenerate.Metrics {
-				log.Println("Useful metric:", usefulMetric)
+				log.Infof("Useful metric: %v", usefulMetric)
 
 				for _, metric := range GetMetricsFromResults(result) {
 					if (metric.Name == usefulMetric) {

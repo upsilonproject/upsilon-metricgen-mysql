@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	log "github.com/sirupsen/logrus"
 	"time"
 	"database/sql"
 	metricgen "github.com/upsilonproject/upsilon-metricgen-mysql/internal"
@@ -10,20 +10,18 @@ import (
 
 var (
 	dbUpsilon *sql.DB;
-	dbMetrics *sql.DB;
 )
 
 func main() {
-	log.SetPrefix("metricgen ")
+	log.Infof("upsilon-metricgen-mysql \033];upsilon-metricgen-mysql\a")
 
 	dbUpsilon = metricgen.DbConn("upsilon")
-	dbMetrics = metricgen.DbConn("upsilon_results")
 
-	stmtInsert := updb.PrepareMetricInsert(dbMetrics)
+	stmtInsert := updb.PrepareMetricInsert(dbUpsilon)
 
 	for true {
-		metricgen.RunServiceLoop(dbUpsilon, dbMetrics, stmtInsert);
-		log.Println("Chunk complete, sleeping")
+		metricgen.RunServiceLoop(dbUpsilon, stmtInsert);
+		log.Infof("Chunk complete, sleeping")
 		time.Sleep(30 * time.Second)
 	}
 }
