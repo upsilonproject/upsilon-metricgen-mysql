@@ -22,6 +22,6 @@ func main() {
 	for true {
 		metricgen.RunServiceLoop(dbUpsilon, stmtInsert);
 		log.Infof("Chunk complete, sleeping")
-		time.Sleep(30 * time.Second)
+		time.Sleep(10 * time.Second)
 	}
 }
