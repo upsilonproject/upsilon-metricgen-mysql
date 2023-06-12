@@ -29,10 +29,10 @@ func DbConn(dbName string) (db *sql.DB) {
 	return db;
 }
 
-func GetMetricsFromResults(service ServiceResult) []Metric {
+func GetMetricsFromResult(service ServiceResult) map[string]Metric {
 	if (strings.Contains(service.Output, "json")) {
 		return extractMetrics(service.Output);
 	} else {
-		return make([]Metric, 0);
+		return make(map[string]Metric, 0);
 	}
 }

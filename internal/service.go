@@ -1,18 +1,22 @@
 package metricgen;
 
 import (
-	"fmt"
 	log "github.com/sirupsen/logrus"
 	"database/sql"
 	upmodels "github.com/upsilonproject/upsilon-golib-database/pkg/models"
 	updb "github.com/upsilonproject/upsilon-golib-database/pkg/database"
 )
 
-func GetMetricsToGenerate(dbUpsilon *sql.DB) []upmodels.MetricToGenerate {
-	var sql string
-	var ret = make([]upmodels.MetricToGenerate, 0)
+type MetricToGenerate struct {
+	Service string
+	Name string
+}
 
-	sql = "SELECT DISTINCT service FROM to_generate ORDER BY service"
+func GetMetricsToGenerate(dbUpsilon *sql.DB) []MetricToGenerate {
+	var sql string
+	var ret = make([]MetricToGenerate, 0)
+
+	sql = "SELECT service, name FROM to_generate ORDER BY service"
 	cursorService, err := dbUpsilon.Query(sql)
 
 	if err != nil {
@@ -21,22 +25,9 @@ func GetMetricsToGenerate(dbUpsilon *sql.DB) []upmodels.MetricToGenerate {
 	}
 
 	for cursorService.Next() {
-		var toGenerate = upmodels.MetricToGenerate{Service: "ignore", Metrics: make([]string, 0)}
+		var toGenerate = MetricToGenerate{}
 
-		cursorService.Scan(&toGenerate.Service)
-
-		sql = "SELECT name FROM to_generate WHERE service = ?"
-		cursorNames, _ := dbUpsilon.Query(sql, toGenerate.Service)
-
-		for cursorNames.Next() {
-			currentMetric := ""
-
-			cursorNames.Scan(&currentMetric);
-
-			toGenerate.Metrics = append(toGenerate.Metrics, currentMetric);
-		}
-
-		defer cursorNames.Close()
+		cursorService.Scan(&toGenerate.Service, &toGenerate.Name)
 
 		ret = append(ret, toGenerate)
 	}
@@ -46,17 +37,17 @@ func GetMetricsToGenerate(dbUpsilon *sql.DB) []upmodels.MetricToGenerate {
 	return ret
 }
 
-func getUnprocessedServiceResults(dbUpsilon *sql.DB, serviceName string) []upmodels.ServiceResult {
+func getUnprocessedServiceResults(dbUpsilon *sql.DB) []upmodels.ServiceResult {
 	var sql string
 	var ret = make([]upmodels.ServiceResult, 0)
 
 	sql = "UPDATE service_check_results SET metricProcessed = 1 WHERE id = ? "
 	stmt, err := dbUpsilon.Prepare(sql)
 
-	log.Infof("Getting unprocessed services")
+	log.Debugf("Getting unprocessed service_check_results")
 
-	sql = "SELECT r.id, r.output, r.checked, r.service FROM service_check_results r WHERE r.service = ? AND r.metricProcessed = 0 ORDER BY r.id ASC LIMIT 2000"
-	cursor, err := dbUpsilon.Query(sql, serviceName)
+	sql = "SELECT r.id, r.output, r.checked, r.service FROM service_check_results r WHERE r.metricProcessed = 0 ORDER BY r.id ASC LIMIT 2000"
+	cursor, err := dbUpsilon.Query(sql)
 
 	if err != nil {
 		panic(err)
@@ -67,38 +58,55 @@ func getUnprocessedServiceResults(dbUpsilon *sql.DB, serviceName string) []upmod
 
 		cursor.Scan(&result.Id, &result.Output, &result.Updated, &result.Identifier)
 
-		fmt.Printf("id: %v, updated %v \n", result.Id, result.Updated)
+		log.WithFields(log.Fields {
+			"id": result.Id,
+			"updated": result.Updated,
+			"service": result.Identifier,
+		}).Infof("New service_check_result to process")
 
 		ret = append(ret, result)
 
 		stmt.Exec(result.Id)
 	}
 
-	stmt.Close();
+	log.Infof("Total # of service_check_results to process: %v", len(ret))
 
-	log.Infof("Finished getting service results relevant for metric")
+	stmt.Close();
 
 	return ret
 }
 
 func RunServiceLoop(dbUpsilon *sql.DB, stmtInsert *sql.Stmt) {
-	for _, metricsToGenerate := range GetMetricsToGenerate(dbUpsilon) {
-		log.Infof("Generating metrics for service", metricsToGenerate.Service)
-		log.Infof("togen: %v", metricsToGenerate)
+	results := getUnprocessedServiceResults(dbUpsilon)
 
-		results := getUnprocessedServiceResults(dbUpsilon, metricsToGenerate.Service)
+	for _, wantedMetric := range GetMetricsToGenerate(dbUpsilon) {
+		log.WithFields(log.Fields{
+			"service": wantedMetric.Service,
+			"metrics": wantedMetric.Name,
+		}).Infof("Generating metrics for service")
 
 		for _, result := range results {
-			log.Infof("Checking result: %v", result.Id)
+			if result.Identifier != wantedMetric.Service {
+				continue
+			}
 
-			for _, usefulMetric := range metricsToGenerate.Metrics {
-				log.Infof("Useful metric: %v", usefulMetric)
+			metricsInResult := GetMetricsFromResult(result)
 
-				for _, metric := range GetMetricsFromResults(result) {
-					if (metric.Name == usefulMetric) {
-						updb.InsertMetric(stmtInsert, result, metric)
-					}
-				}
+			metric, found := metricsInResult[wantedMetric.Name]
+
+			if found {
+				log.WithFields(log.Fields {
+					"name": wantedMetric.Name,
+					"result": result.Id,
+				}).Infof("Found metric in result")
+
+				updb.InsertMetric(stmtInsert, result, metric)
+			} else {
+				log.WithFields(log.Fields {
+					"name": wantedMetric.Name,
+					"result": result.Id,
+					"service": result.Identifier,
+				}).Warnf("Metric not found in result")
 			}
 		}
 	}

@@ -34,8 +34,8 @@ func parseMetric(output gjson.Result) Metric {
 	return m;
 }
 
-func extractMetricsJson(output string) ([]Metric) {
-	var ret = make([]Metric, 0);
+func extractMetricsJson(output string) (map[string]Metric) {
+	var ret = make(map[string]Metric, 0);
 	jsonOutput, err := findJsonInOutput(output);
 
 	if (err != nil) {
@@ -44,7 +44,9 @@ func extractMetricsJson(output string) ([]Metric) {
 
 	gjson.Get(jsonOutput, "metrics").ForEach(
 		func(_, v gjson.Result) bool {
-			ret = append(ret, parseMetric(v));
+			metric := parseMetric(v)
+
+			ret[metric.Name] = metric;
 
 			return true;
 		},
@@ -53,13 +55,13 @@ func extractMetricsJson(output string) ([]Metric) {
 	return ret;
 }
 
-func extractMetrics(output string) ([]Metric) {
-	var ret []Metric;
+func extractMetrics(output string) (map[string]Metric) {
+	ret := make(map[string]Metric)
 
 	if (strings.Contains(output, "<json>")) {
 		ret = extractMetricsJson(output);
 	} else {
-		ret = make([]Metric, 0);
+		ret = make(map[string]Metric, 0);
 	}
 
 	return ret;
